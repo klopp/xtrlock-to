@@ -1,5 +1,5 @@
 # xtrlock-to
-Wrapper for [xtrlock](https://packages.debian.org/sid/xtrlock).
+Wrapper for [xtrlock](https://packages.debian.org/sid/xtrlock). Lock keyboard and mouse by timeout.
 
 ## Usage
 
