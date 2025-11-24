@@ -3,8 +3,9 @@
 # ------------------------------------------------------------------------------
 use Modern::Perl;
 use Const::Fast;
-use Daemon::Daemonize qw/check_pidfile daemonize delete_pidfile write_pidfile/;
-use English           qw/-no_match_vars/;
+use Daemon::Daemonize   qw/check_pidfile daemonize delete_pidfile write_pidfile/;
+use English             qw/-no_match_vars/;
+use File::Util::Tempdir qw/get_user_tempdir/;
 use File::Which;
 use Getopt::Long;
 use IPC::Run       qw/run/;
@@ -30,14 +31,15 @@ const my $MILLISEC       => 1_000;
 const my @TERMSIG        => qw/INT HUP TERM QUIT USR1 USR2 PIPE ABRT BUS FPE ILL SEGV SYS TRAP/;
 const my $XPRINTIDLE_EXE => 'xprintidle';
 const my $XTRLOCK_EXE    => 'xtrlock';
+const my $PIDFILE        => sprintf '%s/%s.pid', get_user_tempdir(), $PROGRAM_NAME;
 my $xprintidle = which($XPRINTIDLE_EXE);
 $xprintidle or _no_exe($XPRINTIDLE_EXE);
 my $xtrlock = which($XTRLOCK_EXE);
 $xtrlock or _no_exe($XTRLOCK_EXE);
 
 # ------------------------------------------------------------------------------
-chek_pidfile() and _error('already loaded');
-write_pidfile();
+check_pidfile($PIDFILE) and _error('already loaded');
+write_pidfile($PIDFILE);
 
 # ------------------------------------------------------------------------------
 $timeout *= ( $SEC_IN_MIN * $MILLISEC );
@@ -80,7 +82,7 @@ sub _unlock
 {
     my $x = find_proc( name => $XTRLOCK_EXE );
     kill 'TERM', $_ for @{$x};
-    delete_pidfile();
+    delete_pidfile($PIDFILE);
     return exit 0;
 }
 
