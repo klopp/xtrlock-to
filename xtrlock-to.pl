@@ -14,18 +14,14 @@ use Sys::SigAction qw/set_sig_handler/;
 our $VERSION = 'v1.5';
 
 # ------------------------------------------------------------------------------
-my @xargs = ('-f');
-my ( $opt_b, $timeout, $daemonize );
-
+my %opt = ( 'xargs' => ['-f'] );
 GetOptions(
-    't=i' => \$timeout,
-    'b'   => \$opt_b,
-    'd'   => \$daemonize,
+    't=i'    => \$opt{t},
+    'b'      => sub { push @{ $opt{xargs} }, '-b' },
+    'd'      => \$opt{d},
+    'h|help' => \&_usage,
 ) or _usage();
-$opt_b and push @xargs, '-b';
-
-$timeout or _usage();
-
+$opt{t} or _usage();
 const my $SEC_IN_MIN     => 60;
 const my $MILLISEC       => 1_000;
 const my @TERMSIG        => qw/INT HUP TERM QUIT USR1 USR2 PIPE ABRT BUS FPE ILL SEGV SYS TRAP/;
@@ -42,12 +38,10 @@ check_pidfile($PIDFILE) and _error('already loaded');
 write_pidfile($PIDFILE);
 
 # ------------------------------------------------------------------------------
-$timeout *= ( $SEC_IN_MIN * $MILLISEC );
-
-$daemonize and Daemon::Daemonize->daemonize();
-
-set_sig_handler 'ALRM', \&_alarm;
+$opt{t} *= ( $SEC_IN_MIN * $MILLISEC );
+$opt{d} and daemonize();
 set_sig_handler $_,     \&_unlock for @TERMSIG;
+set_sig_handler 'ALRM', \&_alarm;
 alarm 1;
 
 while (1) {
@@ -61,20 +55,14 @@ sub _alarm
     my $x = find_proc( name => $XTRLOCK_EXE );
     if ( @{$x} == 0 ) {
         my $idle;
-        run [$xprintidle], \&_do_nothing, \$idle, \&_do_nothing;
+        run [$xprintidle], sub { }, \$idle, sub { };
         $idle =~ s/^\s+|\s+$//gsm;
-        if ( $idle >= $timeout ) {
-            run [ $xtrlock, @xargs ], \&_do_nothing, \&_do_nothing, \&_do_nothing;
+        if ( $idle >= $opt{t} ) {
+            run [ $xtrlock, @{ $opt{xargs} } ];
         }
     }
 
     return alarm $SEC_IN_MIN;
-}
-
-# ------------------------------------------------------------------------------
-sub _do_nothing
-{
-    return;
 }
 
 # ------------------------------------------------------------------------------
@@ -110,4 +98,4 @@ sub _usage
     return exit 1;
 }
 
-# ------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------s-
