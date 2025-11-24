@@ -34,7 +34,9 @@ my $xtrlock = which($XTRLOCK_EXE);
 $xtrlock or _no_exe($XTRLOCK_EXE);
 
 # ------------------------------------------------------------------------------
-check_pidfile($PIDFILE) and _error('already loaded');
+my $x = find_proc( name => $XTRLOCK_EXE );
+@{$x} > 0 and _error( sprintf '%u running instance(s) of %s found', scalar @{$x}, $XTRLOCK_EXE );
+check_pidfile($PIDFILE) and _error( sprintf '%s already loaded', $PROGRAM_NAME );
 write_pidfile($PIDFILE);
 
 # ------------------------------------------------------------------------------
@@ -42,7 +44,7 @@ $opt{t} *= ( $SEC_IN_MIN * $MILLISEC );
 $opt{d} and daemonize();
 set_sig_handler $_,     \&_unlock for @TERMSIG;
 set_sig_handler 'ALRM', \&_alarm;
-alarm 1;
+alarm $SEC_IN_MIN - 1;
 
 while (1) {
     sleep $SEC_IN_MIN;
@@ -98,4 +100,4 @@ sub _usage
     return exit 1;
 }
 
-# -----------------------------------------------------------------------------s-
+# ------------------------------------------------------------------------------
