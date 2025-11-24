@@ -3,14 +3,14 @@
 # ------------------------------------------------------------------------------
 use Modern::Perl;
 use Const::Fast;
-use Daemon::Daemonize;
-use English qw/-no_match_vars/;
+use Daemon::Daemonize qw/check_pidfile daemonize delete_pidfile write_pidfile/;
+use English           qw/-no_match_vars/;
 use File::Which;
 use Getopt::Long;
 use IPC::Run       qw/run/;
 use Proc::Find     qw/find_proc/;
 use Sys::SigAction qw/set_sig_handler/;
-our $VERSION = 'v1.4';
+our $VERSION = 'v1.5';
 
 # ------------------------------------------------------------------------------
 my @xargs = ('-f');
@@ -34,6 +34,10 @@ my $xprintidle = which($XPRINTIDLE_EXE);
 $xprintidle or _no_exe($XPRINTIDLE_EXE);
 my $xtrlock = which($XTRLOCK_EXE);
 $xtrlock or _no_exe($XTRLOCK_EXE);
+
+# ------------------------------------------------------------------------------
+chek_pidfile() and _error('already loaded');
+write_pidfile();
 
 # ------------------------------------------------------------------------------
 $timeout *= ( $SEC_IN_MIN * $MILLISEC );
@@ -76,15 +80,23 @@ sub _unlock
 {
     my $x = find_proc( name => $XTRLOCK_EXE );
     kill 'TERM', $_ for @{$x};
+    delete_pidfile();
     return exit 0;
+}
+
+# ------------------------------------------------------------------------------
+sub _error
+{
+    my ($msg) = @_;
+    printf "Error: %s.\n", $msg;
+    return exit 1;
 }
 
 # ------------------------------------------------------------------------------
 sub _no_exe
 {
     my ($exe) = @_;
-    printf "Error: executable '%s' not found.\n", $exe;
-    return exit 1;
+    return _error( sprintf 'executable "%s" not found', $exe );
 }
 
 # ------------------------------------------------------------------------------
