@@ -1,5 +1,5 @@
 # xtrlock-to
-Wrapper for [xtrlock](https://packages.debian.org/sid/xtrlock). mon.
+Wrapper for [xtrlock](https://packages.debian.org/sid/xtrlock).
 
 ## Usage
 
