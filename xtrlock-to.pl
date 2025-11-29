@@ -54,7 +54,10 @@ sub _alarm
     my $x = find_proc( name => $XTRLOCK_EXE );
     if ( @{$x} == 0 ) {
         my $idle = GetIdleTime();
-        if ( $idle >= $opt{t} ) {
+        if ( $idle < 0 ) {
+            Carp::cluck('Can not get idle time');
+        }
+        elsif ( $idle >= $opt{t} ) {
             run [ $xtrlock, @{ $opt{xargs} } ];
         }
     }
