@@ -58,7 +58,10 @@ sub _alarm
             Carp::cluck('Can not get idle time');
         }
         elsif ( $idle >= $opt{t} ) {
-            run [ $xtrlock, @{ $opt{xargs} } ];
+            my $stderr;
+            run [ $xtrlock, @{ $opt{xargs} } ], sub { }, sub { }, \$stderr;
+            $stderr and $stderr =~ s/^\s+\s+$//gsm;
+            $stderr and Carp::cluck sprintf '%s :: %s', $xtrlock, $stderr;
         }
     }
 
@@ -92,8 +95,7 @@ sub _no_exe
 # ------------------------------------------------------------------------------
 sub _usage
 {
-    printf
-        "Usage: %s options:\n  -t=minutes (timeout)\n  -b (blank screen after lock)\n  -d (run as daemon)\n",
+    printf "Usage: %s options:\n  -t=minutes (timeout)\n  -b (blank screen after lock)\n  -d (run as daemon)\n",
         $PROGRAM_NAME;
     return exit 1;
 }
