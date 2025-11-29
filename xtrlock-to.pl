@@ -3,16 +3,25 @@
 # ------------------------------------------------------------------------------
 use Modern::Perl;
 use Const::Fast;
-use Daemon::Daemonize   qw/check_pidfile daemonize delete_pidfile write_pidfile/;
-use English             qw/-no_match_vars/;
+use Daemon::Daemonize qw/check_pidfile daemonize delete_pidfile write_pidfile/;
+use English           qw/-no_match_vars/;
+use File::Basename;
 use File::Util::Tempdir qw/get_user_tempdir/;
 use File::Which;
 use Getopt::Long;
 use IPC::Run       qw/run/;
 use Proc::Find     qw/find_proc/;
 use Sys::SigAction qw/set_sig_handler/;
+use Try::Catch;
 use X11::IdleTime;
 our $VERSION = 'v1.6';
+
+# ------------------------------------------------------------------------------
+const my $SEC_IN_MIN  => 60;
+const my @TERMSIG     => qw/INT HUP TERM QUIT USR1 USR2 PIPE ABRT BUS FPE ILL SEGV SYS TRAP/;
+const my $SELF_NAME   => basename($PROGRAM_NAME);
+const my $PIDFILE     => sprintf '%s/%s.pid', get_user_tempdir(), $SELF_NAME;
+const my $XTRLOCK_EXE => 'xtrlock';
 
 # ------------------------------------------------------------------------------
 my %opt = ( 'xargs' => ['-f'] );
@@ -23,18 +32,19 @@ GetOptions(
     'h|help' => \&_usage,
 ) or _usage();
 $opt{t} or _usage();
-const my $SEC_IN_MIN  => 60;
-const my @TERMSIG     => qw/INT HUP TERM QUIT USR1 USR2 PIPE ABRT BUS FPE ILL SEGV SYS TRAP/;
-const my $XTRLOCK_EXE => 'xtrlock';
-const my $PIDFILE     => sprintf '%s/%s.pid', get_user_tempdir(), $PROGRAM_NAME;
 my $xtrlock = which($XTRLOCK_EXE);
-$xtrlock or _no_exe($XTRLOCK_EXE);
+$xtrlock or _error( sprintf 'executable "%s" not found', $XTRLOCK_EXE );
 
 # ------------------------------------------------------------------------------
 my $x = find_proc( name => $XTRLOCK_EXE );
 @{$x} > 0 and _error( sprintf '%u running instance(s) of %s found', scalar @{$x}, $XTRLOCK_EXE );
-check_pidfile($PIDFILE) and _error( sprintf '%s already loaded', $PROGRAM_NAME );
-write_pidfile($PIDFILE);
+check_pidfile($PIDFILE) and _error( sprintf '%s already loaded', $SELF_NAME );
+try {
+    write_pidfile($PIDFILE);
+}
+catch {
+    _error( sprintf '%s', $_ );
+};
 
 # ------------------------------------------------------------------------------
 $opt{t} *= $SEC_IN_MIN;
@@ -60,7 +70,7 @@ sub _alarm
         elsif ( $idle >= $opt{t} ) {
             my $stderr;
             run [ $xtrlock, @{ $opt{xargs} } ], sub { }, sub { }, \$stderr;
-            $stderr and $stderr =~ s/^\s+\s+$//gsm;
+            $stderr and $stderr =~ s/^\s+|\s+$//gsm;
             $stderr and Carp::cluck sprintf '%s :: %s', $xtrlock, $stderr;
         }
     }
@@ -81,22 +91,15 @@ sub _unlock
 sub _error
 {
     my ($msg) = @_;
-    printf "Error: %s.\n", $msg;
+    warn sprintf "%s :: error: %s.\n", $SELF_NAME, $msg;
     return exit 1;
-}
-
-# ------------------------------------------------------------------------------
-sub _no_exe
-{
-    my ($exe) = @_;
-    return _error( sprintf 'executable "%s" not found', $exe );
 }
 
 # ------------------------------------------------------------------------------
 sub _usage
 {
     printf "Usage: %s options:\n  -t=minutes (timeout)\n  -b (blank screen after lock)\n  -d (run as daemon)\n",
-        $PROGRAM_NAME;
+        $SELF_NAME;
     return exit 1;
 }
 
