@@ -11,6 +11,7 @@ use Getopt::Long;
 use IPC::Run       qw/run/;
 use Proc::Find     qw/find_proc/;
 use Sys::SigAction qw/set_sig_handler/;
+use X11::IdleTime;
 our $VERSION = 'v1.5';
 
 # ------------------------------------------------------------------------------
@@ -22,14 +23,10 @@ GetOptions(
     'h|help' => \&_usage,
 ) or _usage();
 $opt{t} or _usage();
-const my $SEC_IN_MIN     => 60;
-const my $MILLISEC       => 1_000;
-const my @TERMSIG        => qw/INT HUP TERM QUIT USR1 USR2 PIPE ABRT BUS FPE ILL SEGV SYS TRAP/;
-const my $XPRINTIDLE_EXE => 'xprintidle';
-const my $XTRLOCK_EXE    => 'xtrlock';
-const my $PIDFILE        => sprintf '%s/%s.pid', get_user_tempdir(), $PROGRAM_NAME;
-my $xprintidle = which($XPRINTIDLE_EXE);
-$xprintidle or _no_exe($XPRINTIDLE_EXE);
+const my $SEC_IN_MIN  => 60;
+const my @TERMSIG     => qw/INT HUP TERM QUIT USR1 USR2 PIPE ABRT BUS FPE ILL SEGV SYS TRAP/;
+const my $XTRLOCK_EXE => 'xtrlock';
+const my $PIDFILE     => sprintf '%s/%s.pid', get_user_tempdir(), $PROGRAM_NAME;
 my $xtrlock = which($XTRLOCK_EXE);
 $xtrlock or _no_exe($XTRLOCK_EXE);
 
@@ -40,7 +37,7 @@ check_pidfile($PIDFILE) and _error( sprintf '%s already loaded', $PROGRAM_NAME )
 write_pidfile($PIDFILE);
 
 # ------------------------------------------------------------------------------
-$opt{t} *= ( $SEC_IN_MIN * $MILLISEC );
+$opt{t} *= $SEC_IN_MIN;
 $opt{d} and daemonize();
 set_sig_handler $_,     \&_unlock for @TERMSIG;
 set_sig_handler 'ALRM', \&_alarm;
@@ -56,9 +53,7 @@ sub _alarm
 {
     my $x = find_proc( name => $XTRLOCK_EXE );
     if ( @{$x} == 0 ) {
-        my $idle;
-        run [$xprintidle], sub { }, \$idle, sub { };
-        $idle =~ s/^\s+|\s+$//gsm;
+        my $idle = GetIdleTime();
         if ( $idle >= $opt{t} ) {
             run [ $xtrlock, @{ $opt{xargs} } ];
         }
