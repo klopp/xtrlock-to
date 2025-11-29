@@ -12,7 +12,7 @@ use IPC::Run       qw/run/;
 use Proc::Find     qw/find_proc/;
 use Sys::SigAction qw/set_sig_handler/;
 use X11::IdleTime;
-our $VERSION = 'v1.5';
+our $VERSION = 'v1.6';
 
 # ------------------------------------------------------------------------------
 my %opt = ( 'xargs' => ['-f'] );
